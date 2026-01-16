@@ -15,7 +15,7 @@ import LeadDetail from '@pages/Admin/LeadDetail/LeadDetail';
 import Header from '@/components/Layouts/Header';
 
 // Auth hook
-import { useAuth } from '@lib/hooks/useAuth';
+import {useAuth} from '@/lib/hooks/useAuth';
 
 // Configure React Query
 const queryClient = new QueryClient({
