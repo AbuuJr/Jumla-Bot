@@ -2,12 +2,9 @@
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import path from 'path';
-import tsconfigPaths from 'vite-tsconfig-paths';
 
 export default defineConfig({
-  plugins: [
-    tsconfigPaths(),
-    react()],
+  plugins: [react()],
   css: {
     postcss: './postcss.config.cjs',
   },
@@ -19,6 +16,7 @@ export default defineConfig({
       '@lib': path.resolve(__dirname, './src/lib'),
       '@mocks': path.resolve(__dirname, './src/mocks'),
     },
+    extensions: ['.mjs', '.js', '.mts', '.ts', '.jsx', '.tsx', '.json'],
   },
   server: {
     port: 3000,
@@ -32,6 +30,11 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: true,
+    rollupOptions: {
+      output: {
+        manualChunks: undefined,
+      },
+    },
   },
   test: {
     globals: true,
