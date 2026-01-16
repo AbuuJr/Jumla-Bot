@@ -1,4 +1,4 @@
-import { useForm } from 'react-hook-form';
+import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useCreateLead } from '@lib/hooks/useLead';
@@ -43,7 +43,7 @@ export default function FallbackForm({ onSuccess }: FallbackFormProps) {
     resolver: zodResolver(formSchema),
   });
 
-  const onSubmit = async (data: FormData) => {
+  const onSubmit: SubmitHandler<FormData> = async (data) => {
     try {
       const response = await createLead.mutateAsync({
         source: 'form',
