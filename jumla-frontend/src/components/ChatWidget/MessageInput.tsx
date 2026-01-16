@@ -77,7 +77,7 @@ export default function MessageInput({
     <div className="flex flex-col gap-2">
       {attachments.length > 0 && (
         <div className="flex flex-wrap gap-2">
-          {attachments.map((url, idx) => (
+          {attachments.map((_, idx) => (
             <div
               key={idx}
               className="flex items-center gap-1 rounded-md bg-neutral-100 px-2 py-1 text-xs"
