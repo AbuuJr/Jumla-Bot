@@ -27,7 +27,7 @@
           "description": "How they prefer to be contacted"
         }
       },
-      "required": ["name", "phone", "email", "preferred_contact_method"],
+      "required": ["name", "phone", "email"],
       "additionalProperties": false
     },
     "property": {

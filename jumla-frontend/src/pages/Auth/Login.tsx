@@ -95,7 +95,7 @@ export default function Login() {
 
         <div className="mt-4 text-center text-sm text-neutral-600">
           <p>Demo credentials:</p>
-          <p className="font-mono">admin@jumla.com / password123</p>
+          <p className="font-mono">Contact super-admin: abuu.markets@gmail.com</p>
         </div>
       </Card>
     </div>
