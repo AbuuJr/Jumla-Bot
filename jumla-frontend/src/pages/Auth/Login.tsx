@@ -89,7 +89,7 @@ export default function Login() {
             fullWidth
             isLoading={isSubmitting}
           >
-            Sign In
+            Sign In | Get Credentials 
           </Button>
         </form>
 
