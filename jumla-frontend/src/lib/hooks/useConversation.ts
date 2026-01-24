@@ -1,29 +1,45 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { conversationsApi } from '@lib/api/clients';
 import type { SendMessageRequest } from '@lib/api/types';
-import { leadKeys } from './useLead';
 
 // ============================================================================
-// Conversation Hooks - React Query hooks for chat operations
+// Conversation Hooks
 // ============================================================================
 
-interface SendMessageParams {
-  conversationId: string;
-  data: SendMessageRequest;
-  leadId?: string; // For cache invalidation
+export const conversationKeys = {
+  all: ['conversations'] as const,
+  lead: (leadId: string) => [...conversationKeys.all, 'lead', leadId] as const,
+};
+
+// ===== Fetch Messages for Lead =====
+export function useMessages(leadId: string) {
+  return useQuery({
+    queryKey: conversationKeys.lead(leadId),
+    queryFn: () => conversationsApi.getMessages(leadId),
+    enabled: !!leadId,
+    staleTime: 1000 * 10, // 10 seconds
+  });
 }
 
+// ===== Send Message =====
 export function useSendMessage() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ conversationId, data }: SendMessageParams) =>
-      conversationsApi.sendMessage(conversationId, data),
+    mutationFn: async ({
+      leadId,
+      data,
+    }: {
+      leadId: string;
+      data: SendMessageRequest;
+    }) => {
+      return conversationsApi.sendMessage(leadId, data);
+    },
     onSuccess: (_, variables) => {
-      // Invalidate lead detail to refresh conversation
-      if (variables.leadId) {
-        queryClient.invalidateQueries({ queryKey: leadKeys.detail(variables.leadId) });
-      }
+      // Invalidate messages for this lead
+      queryClient.invalidateQueries({
+        queryKey: conversationKeys.lead(variables.leadId),
+      });
     },
   });
 }

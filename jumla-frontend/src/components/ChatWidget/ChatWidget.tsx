@@ -124,7 +124,7 @@ export default function ChatWidget({ className, onLeadCreated, initialMessages =
 
   // Handle subsequent messages
   const handleSendMessage = async (content: string, attachments?: string[]) => {
-    if (!conversationId) {
+    if (!leadId) {
       return handleFirstMessage(content, attachments);
     }
 
@@ -140,9 +140,9 @@ export default function ChatWidget({ className, onLeadCreated, initialMessages =
     setError(null);
 
     try {
+      // Use leadId instead of conversationId
       const response = await sendMessage.mutateAsync({
-        conversationId,
-        leadId,
+        leadId, // Changed from conversationId
         data: {
           content,
           attachments,
@@ -160,7 +160,6 @@ export default function ChatWidget({ className, onLeadCreated, initialMessages =
       setError(err.message || 'Failed to send message. Please try again.');
     }
   };
-
   // Retry failed message
   const handleRetry = (messageId: string) => {
     const failedMessage = pendingMessages.find((m) => m.id === messageId);

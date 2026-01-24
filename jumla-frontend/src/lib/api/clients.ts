@@ -69,19 +69,21 @@ export const leadsApi = {
 
 // ===== Conversations =====
 export const conversationsApi = {
+  // Send message (using lead_id, not conversation_id)
   sendMessage: async (
-    conversationId: string,
+    leadId: string,
     data: SendMessageRequest
   ): Promise<SendMessageResponse> => {
     const response = await apiClient.post<SendMessageResponse>(
-      `/api/v1/conversations/${conversationId}/messages`,
+      `/api/v1/conversations/${leadId}/message`,
       data
     );
     return response.data;
   },
 
-  getMessages: async (conversationId: string) => {
-    const response = await apiClient.get(`/api/v1/conversations/${conversationId}/messages`);
+  // Get messages for a lead
+  getMessages: async (leadId: string) => {
+    const response = await apiClient.get(`/api/v1/conversations/lead/${leadId}`);
     return response.data;
   },
 };

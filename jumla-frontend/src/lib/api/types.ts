@@ -1,5 +1,6 @@
 // ============================================================================
 // API Types - All request/response interfaces for MVP endpoints
+// Fixed: Changed 'status' to 'stage' to match backend model
 // ============================================================================
 
 // ===== Authentication =====
@@ -26,7 +27,7 @@ export interface User {
 // ===== Leads =====
 export interface Lead {
   id: string;
-  status: 'new' | 'qualifying' | 'qualified' | 'offer_generated' | 'offer_approved' | 'closed';
+  stage: 'new' | 'contacted' | 'qualified' | 'offer_made' | 'closed_won' | 'closed_lost';  // Fixed: renamed from 'status' to 'stage'
   source: 'chat' | 'form' | 'api';
   created_at: string;
   updated_at: string;
