@@ -23,7 +23,8 @@ class GeminiAdapter(LLMProviderAdapter):
         
         # Initialize Gemini client
         try:
-            self.gemini_client = genai.Client(api_key=config.gemini_api_key)
+            genai.configure(api_key=config.gemini_api_key)
+            self.gemini_client = genai.GenerativeModel(self.config.gemini_model)
             logger.info("Gemini SDK client initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize Gemini client: {e}")
@@ -62,10 +63,10 @@ class GeminiAdapter(LLMProviderAdapter):
             }
             
             # Make the API call using SDK
-            response = self.gemini_client.models.generate_content(
-                model=self.config.gemini_model,
+            response = self.gemini_client.generate_content(
+                #model=self.config.gemini_model,
                 contents=full_prompt,
-                config=types.GenerateContentConfig(**config_dict)
+                generation_config=types.GenerationConfig(**config_dict)
             )
             
             latency_ms = (time.time() - start_time) * 1000
