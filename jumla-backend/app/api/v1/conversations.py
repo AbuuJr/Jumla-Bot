@@ -867,6 +867,54 @@ async def send_message(
         },
     )
 
+@router.post(
+    "/{conversation_id}/messages",  # ← PLURAL to match frontend
+    response_model=SendMessageResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Send message using conversation ID"
+)
+async def send_message_by_conversation_id(
+    conversation_id: UUID,
+    message_data: SendMessageRequest,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    llm_client: LLMClient = Depends(get_llm_client),
+    rate_limiter: TokenBucketRateLimiter = Depends(get_rate_limiter),
+):
+    """
+    Send a message using conversation ID (frontend compatibility).
+    
+    This endpoint looks up the lead_id from the conversation_id,
+    then delegates to the main send_message logic.
+    """
+    
+    # Look up the lead_id from conversation_id
+    result = await db.execute(
+        select(Conversation).where(Conversation.id == conversation_id)
+    )
+    conversation = result.scalar_one_or_none()
+    
+    if not conversation:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Conversation not found"
+        )
+    
+    # Get the lead_id
+    lead_id = conversation.lead_id
+    
+    # Call the existing send_message function
+    return await send_message(
+        lead_id=lead_id,
+        message_data=message_data,
+        background_tasks=background_tasks,
+        db=db,
+        current_user=current_user,
+        llm_client=llm_client,
+        rate_limiter=rate_limiter,
+    )
+
 @router.get(
     "/health/ai",
     summary="Get AI services health"
