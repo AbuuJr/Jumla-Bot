@@ -28,9 +28,10 @@ celery==5.3.6
 redis==5.0.1
 flower==2.0.1
 
-# LLM Providers
-openai==1.10.0
-anthropic==0.8.1
+# LLM SDKs (UPDATED - Using official libraries)
+openai==1.54.0              # Official OpenAI SDK
+anthropic==0.39.0           # Official Anthropic SDK
+google-generativeai==0.8.3  # Official Google Gemini SDK
 
 # External Services
 twilio==8.11.1
@@ -63,9 +64,6 @@ flake8==7.0.0
 mypy==1.8.0
 
 
-# LLM SDKs (UPDATED - Using official libraries)
-openai==1.54.0              # Official OpenAI SDK
-anthropic==0.39.0           # Official Anthropic SDK
-google-generativeai==0.8.3  # Official Google Gemini SDK
+
 
 
