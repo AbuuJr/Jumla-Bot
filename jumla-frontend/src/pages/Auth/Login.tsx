@@ -94,7 +94,7 @@ export default function Login() {
         </form>
 
         <div className="mt-4 text-center text-sm text-neutral-600">
-          <p>Credentials:</p>
+          <p>Credentials Needed</p>
           <p className="font-mono">Contact super-admin: abuu.markets@gmail.com for account creation</p>
         </div>
       </Card>
