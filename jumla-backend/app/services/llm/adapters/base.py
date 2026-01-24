@@ -1,13 +1,10 @@
 """
 Abstract base adapter for LLM providers.
+Updated to work with native SDKs.
 """
-
-import time
 import logging
 from abc import ABC, abstractmethod
 from typing import Optional
-
-import httpx
 
 from ..types import LLMConfig, LLMResponse
 from ..circuit_breaker import CircuitBreaker
@@ -21,6 +18,8 @@ class LLMProviderAdapter(ABC):
     
     All provider implementations must inherit from this class
     and implement the complete() method.
+    
+    Updated to support native SDKs instead of raw HTTP.
     """
     
     def __init__(self, config: LLMConfig):
@@ -31,10 +30,6 @@ class LLMProviderAdapter(ABC):
             config: LLM configuration
         """
         self.config = config
-        self.client = httpx.AsyncClient(
-            timeout=config.timeout_seconds,
-            follow_redirects=True,
-        )
         self.circuit_breaker = CircuitBreaker(
             failure_threshold=config.failure_threshold,
             recovery_timeout=config.recovery_timeout,
@@ -69,8 +64,7 @@ class LLMProviderAdapter(ABC):
         pass
     
     async def close(self):
-        """Cleanup resources"""
-        await self.client.aclose()
+        """Cleanup resources - override in subclasses if needed"""
         logger.info(f"{self.__class__.__name__} closed")
     
     def _record_metrics(self, success: bool, latency_ms: float):
