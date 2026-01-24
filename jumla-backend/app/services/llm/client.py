@@ -5,7 +5,9 @@ Handles extraction, response generation, and summarization.
 
 import json
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
+if TYPE_CHECKING:
+    from app.models.lead import Lead
 
 from jsonschema import validate, ValidationError as JsonSchemaValidationError
 
@@ -256,28 +258,35 @@ class LLMClient:
 
 
     def _build_info_summary(self, extracted_data: Optional[Dict[str, Any]]) -> str:
-        """Build summary of information gathered so far"""
+        """
+        Build human-readable summary of lead information for AI context.
+        NOW USES EXTRACTED_DATA WHICH CONTAINS ACCUMULATED INFO
+        """
+        parts = []
+        
         if not extracted_data:
             return "No information gathered yet"
-        
-        parts = []
         
         # Contact info
         contact = extracted_data.get("contact", {})
         if contact.get("name"):
-            parts.append(f"Contact: {contact['name']}")
+            parts.append(f"Name: {contact['name']}")
+        if contact.get("phone"):
+            parts.append(f"Phone: {contact['phone']}")
+        if contact.get("email"):
+            parts.append(f"Email: {contact['email']}")
         
         # Property info
         prop = extracted_data.get("property", {})
         if prop.get("address"):
             parts.append(f"Address: {prop['address']}")
+        elif prop.get("city"):
+            parts.append(f"City: {prop['city']}")
         
         if prop.get("bedrooms"):
             parts.append(f"Bedrooms: {prop['bedrooms']}")
-        
         if prop.get("bathrooms"):
             parts.append(f"Bathrooms: {prop['bathrooms']}")
-        
         if prop.get("condition"):
             parts.append(f"Condition: {prop['condition']}")
         
@@ -285,15 +294,11 @@ class LLMClient:
         situation = extracted_data.get("situation", {})
         if situation.get("urgency"):
             parts.append(f"Timeline: {situation['urgency']}")
-        
         if situation.get("motivation"):
             parts.append(f"Motivation: {situation['motivation']}")
         
-        if situation.get("asking_price"):
-            price = situation['asking_price']
-            parts.append(f"Asking: ${price:,.0f}")
-        
         return "; ".join(parts) if parts else "Limited information provided"
+
     
     async def close(self):
         """Cleanup all provider connections"""

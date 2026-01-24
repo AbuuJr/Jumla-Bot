@@ -5,7 +5,7 @@ Conversation management endpoints with AI integration
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from uuid import UUID
 import logging
 from datetime import datetime
@@ -165,6 +165,59 @@ def _build_info_summary(lead: Lead, extracted_data: Optional[dict] = None) -> st
             parts.append(f"Property: {property_data['address']}")
     
     return "; ".join(parts) if parts else "Limited information available"
+
+
+async def _get_accumulated_extraction(
+    db: AsyncSession,
+    lead_id: UUID,
+) -> Optional[Dict[str, Any]]:
+    """
+    Get accumulated extraction data from all previous conversations.
+    Merges extractions to build complete lead profile.
+    """
+    result = await db.execute(
+        select(Conversation)
+        .where(
+            Conversation.lead_id == lead_id,
+            Conversation.extracted_data.isnot(None),
+        )
+        .order_by(Conversation.created_at.asc())
+    )
+    conversations = result.scalars().all()
+    
+    if not conversations:
+        return None
+    
+    # Start with empty structure
+    accumulated = {
+        "contact": {},
+        "property": {},
+        "situation": {},
+        "intent": {"classification": "needs_more_info", "confidence": 0.5},
+        "metadata": {},
+    }
+    
+    # Merge each extraction (later values override earlier ones)
+    for conv in conversations:
+        if not conv.extracted_data:
+            continue
+        
+        for section in ["contact", "property", "situation", "metadata"]:
+            section_data = conv.extracted_data.get(section, {})
+            for key, value in section_data.items():
+                # Only update if new value is not null
+                if value is not None:
+                    accumulated[section][key] = value
+        
+        # Update intent with latest
+        if conv.extracted_data.get("intent"):
+            accumulated["intent"] = conv.extracted_data["intent"]
+    
+    return accumulated
+
+
+
+
 
 
 def _get_fallback_response(lead_status: str) -> str:
@@ -713,9 +766,14 @@ async def send_message(
 
     if use_ai:
         try:
-            # ================================================================
-            # 5A: Extract structured data
-            # ================================================================
+            # ============================================================
+            # 5A: Get accumulated extraction from previous messages
+            # ============================================================
+            accumulated_data = await _get_accumulated_extraction(db, lead_id)
+            
+            # ============================================================
+            # 5B: Extract structured data from current message
+            # ============================================================
             extraction_result = await llm_client.extract_lead_info(
                 message=message_data.content,
                 sender="chat_user",
@@ -723,11 +781,33 @@ async def send_message(
                 lead_id=str(lead_id),
             )
             
-            extracted_data = extraction_result.data
+            # Merge new extraction with accumulated data
+            if accumulated_data and extraction_result.data:
+                # Start with accumulated data
+                merged_data = accumulated_data.copy()
+                
+                # Overlay new extraction (new data takes precedence)
+                for section in ["contact", "property", "situation", "metadata"]:
+                    new_section = extraction_result.data.get(section, {})
+                    for key, value in new_section.items():
+                        if value is not None:  # Only update non-null values
+                            merged_data[section][key] = value
+                
+                # Always use latest intent
+                if extraction_result.data.get("intent"):
+                    merged_data["intent"] = extraction_result.data["intent"]
+                
+                extracted_data = merged_data
+            else:
+                extracted_data = extraction_result.data
+            
+            # Store extraction in conversation
             user_conversation.extracted_data = extracted_data
             
-            # Update lead with extracted info
-            if extraction_result.validated:
+            # ============================================================
+            # 5C: Update lead with extracted info
+            # ============================================================
+            if extraction_result.validated and extracted_data:
                 contact = extracted_data.get("contact", {})
                 if contact.get("name") and not lead.name:
                     lead.name = contact["name"]
@@ -736,33 +816,36 @@ async def send_message(
                 if contact.get("email") and not lead.email:
                     lead.email = contact["email"]
                 
-                # Update enriched_data
+                # Update enriched_data with MERGED data
                 if not lead.enriched_data:
                     lead.enriched_data = {}
                 lead.enriched_data["latest_extraction"] = extracted_data
                 lead.enriched_data["extraction_timestamp"] = datetime.utcnow().isoformat()
             
-            # Check for escalation signals in extraction notes
-            metadata = extracted_data.get("metadata", {})
-            extraction_notes = metadata.get("extraction_notes", "")
-            if any(signal in extraction_notes for signal in [
+            # ============================================================
+            # 5D: Check for escalation signals (SAFE None checks)
+            # ============================================================
+            metadata = extracted_data.get("metadata", {}) if extracted_data else {}
+            extraction_notes = metadata.get("extraction_notes") or ""
+            
+            if extraction_notes and any(signal in extraction_notes for signal in [
                 "PAYMENT_TERMS_PROPOSED",
                 "NEGOTIATION_REQUESTED", 
                 "LEGAL_QUESTION",
                 "DISTRESS_SIGNAL"
             ]):
-                logger.info(f"Escalation signal detected in extraction: {extraction_notes}")
+                logger.info(f"Escalation signal detected: {extraction_notes}")
                 user_conversation.metadata["escalation_signal"] = extraction_notes
             
-            # ================================================================
-            # 5B: Generate AI response (with smart context)
-            # ================================================================
+            # ============================================================
+            # 5E: Generate AI response with FULL CONTEXT
+            # ============================================================
             response_result = await llm_client.generate_response(
                 message=message_data.content,
                 lead_stage=lead.stage,
-                info_summary="",  # Will be built by generate_response
+                info_summary="",  # Will be built inside generate_response
                 conversation_history=history,
-                extracted_data=extracted_data,  # ✅ NOW PASSING EXTRACTED DATA
+                extracted_data=extracted_data,  # ✅ PASS ACCUMULATED DATA
             )
             
             ai_response_text = response_result.content
@@ -783,21 +866,12 @@ async def send_message(
                     "message": message_data.content[:200],
                 }
                 
-                logger.info(
-                    f"Escalation triggered for lead {lead_id}: {escalation_type}"
-                )
-                
-                # TODO: Create notification/task for agent
-                # await create_escalation_task(
-                #     lead_id=lead_id,
-                #     escalation_type=escalation_type,
-                #     message=message_data.content
-                # )
+                logger.info(f"Escalation triggered for lead {lead_id}: {escalation_type}")
             
             logger.info(f"AI processing successful for lead: {lead_id}")
             
         except Exception as e:
-            logger.error(f"AI processing failed: {str(e)}")
+            logger.error(f"AI processing failed: {str(e)}", exc_info=True)
             # Fallback response
             ai_response_text = (
                 "Thank you for your message! Could you share the property address "
@@ -809,6 +883,8 @@ async def send_message(
         # No AI - simple response
         ai_response_text = "Thank you for your message! A team member will respond shortly."
         user_conversation.metadata["ai_disabled"] = True
+
+
     
     # ========================================================================
     # STEP 6: Create Bot Response Record

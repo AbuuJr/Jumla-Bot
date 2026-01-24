@@ -36,7 +36,7 @@ CONFIDENCE SCORING:
 - 0.3-0.49: Limited information, unclear intent
 - 0.0-0.29: Very little usable information
 
-CRITICAL ESCALATION SIGNALS (add to extraction_notes):
+CRITICAL ESCALATION SIGNALS (add to metadata.extraction_notes):
 - PAYMENT_TERMS_PROPOSED: If message contains "50%", "percent", "partial payment", "installments", "% now", "% later"
 - NEGOTIATION_REQUESTED: If message contains "negotiate", "discuss terms", "make a deal", "counter offer"
 - LEGAL_QUESTION: If message contains "contract", "legal", "lawyer", "attorney"
@@ -51,4 +51,4 @@ LATEST MESSAGE:
 From: {sender}
 Message: {message}
 
-Extract all available information and respond with ONLY the JSON object. No preamble, no explanation, no markdown formatting.
+Extract all available information and respond with ONLY the JSON object. No preamble, no explanation, no markdown formatting
