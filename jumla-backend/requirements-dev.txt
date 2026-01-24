@@ -1,0 +1,16 @@
+# ========================================
+# requirements-dev.txt
+# ========================================
+-r requirements.txt
+
+# Development tools
+ipython==8.20.0
+ipdb==0.13.13
+
+# Testing extras
+faker==22.2.0
+factory-boy==3.3.0
+
+# Documentation
+mkdocs==1.5.3
+mkdocs-material==9.5.3

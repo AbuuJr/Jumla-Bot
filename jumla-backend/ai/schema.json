@@ -1,0 +1,179 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "LeadExtractionSchema",
+  "description": "Strict schema for extracting lead information from real estate wholesaling conversations. No additional properties allowed.",
+  "type": "object",
+  "properties": {
+    "contact": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": ["string", "null"],
+          "description": "Full name of the contact"
+        },
+        "phone": {
+          "type": ["string", "null"],
+          "pattern": "^\\+?[1-9]\\d{1,14}$|^null$",
+          "description": "Phone number in E.164 format or null"
+        },
+        "email": {
+          "type": ["string", "null"],
+          "format": "email",
+          "description": "Email address or null"
+        },
+        "preferred_contact_method": {
+          "type": ["string", "null"],
+          "enum": ["phone", "email", "text", "whatsapp", null],
+          "description": "How they prefer to be contacted"
+        }
+      },
+      "required": ["name", "phone", "email", "preferred_contact_method"],
+      "additionalProperties": false
+    },
+    "property": {
+      "type": "object",
+      "properties": {
+        "address": {
+          "type": ["string", "null"],
+          "description": "Full property address"
+        },
+        "city": {
+          "type": ["string", "null"],
+          "description": "City name"
+        },
+        "state": {
+          "type": ["string", "null"],
+          "description": "State or province"
+        },
+        "zip_code": {
+          "type": ["string", "null"],
+          "pattern": "^\\d{5}(-\\d{4})?$|^null$",
+          "description": "ZIP or postal code"
+        },
+        "property_type": {
+          "type": ["string", "null"],
+          "enum": ["single_family", "multi_family", "condo", "townhouse", "land", "commercial", "other", null],
+          "description": "Type of property"
+        },
+        "bedrooms": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "description": "Number of bedrooms"
+        },
+        "bathrooms": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "description": "Number of bathrooms"
+        },
+        "square_feet": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "description": "Square footage"
+        },
+        "year_built": {
+          "type": ["integer", "null"],
+          "minimum": 1800,
+          "maximum": 2100,
+          "description": "Year property was built"
+        },
+        "condition": {
+          "type": ["string", "null"],
+          "enum": ["excellent", "good", "fair", "poor", "needs_major_repair", null],
+          "description": "Overall property condition"
+        }
+      },
+      "required": ["address", "city", "state", "zip_code", "property_type", "bedrooms", "bathrooms", "square_feet", "year_built", "condition"],
+      "additionalProperties": false
+    },
+    "situation": {
+      "type": "object",
+      "properties": {
+        "motivation": {
+          "type": ["string", "null"],
+          "enum": ["foreclosure", "divorce", "inherited", "downsizing", "relocating", "financial_hardship", "tired_landlord", "other", null],
+          "description": "Primary reason for selling"
+        },
+        "urgency": {
+          "type": ["string", "null"],
+          "enum": ["immediate", "within_30_days", "within_90_days", "flexible", null],
+          "description": "Timeline for selling"
+        },
+        "occupancy_status": {
+          "type": ["string", "null"],
+          "enum": ["owner_occupied", "tenant_occupied", "vacant", null],
+          "description": "Current occupancy status"
+        },
+        "mortgage_status": {
+          "type": ["string", "null"],
+          "enum": ["paid_off", "current", "behind", "in_foreclosure", null],
+          "description": "Status of mortgage payments"
+        },
+        "asking_price": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "description": "Seller's asking price in dollars (if mentioned)"
+        },
+        "repairs_needed": {
+          "type": ["boolean", "null"],
+          "description": "Whether significant repairs are needed"
+        },
+        "open_to_cash_offer": {
+          "type": ["boolean", "null"],
+          "description": "Whether seller is open to cash offers"
+        }
+      },
+      "required": ["motivation", "urgency", "occupancy_status", "mortgage_status", "asking_price", "repairs_needed", "open_to_cash_offer"],
+      "additionalProperties": false
+    },
+    "intent": {
+      "type": "object",
+      "properties": {
+        "classification": {
+          "type": "string",
+          "enum": ["qualified_lead", "needs_more_info", "not_interested", "spam", "unclear"],
+          "description": "Overall intent classification"
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Confidence score for classification (0-1)"
+        },
+        "next_action": {
+          "type": ["string", "null"],
+          "enum": ["schedule_call", "request_photos", "send_info", "follow_up", "close_conversation", null],
+          "description": "Recommended next action"
+        }
+      },
+      "required": ["classification", "confidence", "next_action"],
+      "additionalProperties": false
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "language": {
+          "type": "string",
+          "description": "Detected language (ISO 639-1 code)"
+        },
+        "sentiment": {
+          "type": "string",
+          "enum": ["positive", "neutral", "negative", "frustrated", "urgent"],
+          "description": "Overall sentiment of the message"
+        },
+        "contains_pii": {
+          "type": "boolean",
+          "description": "Whether message contains personally identifiable information"
+        },
+        "extraction_notes": {
+          "type": ["string", "null"],
+          "maxLength": 500,
+          "description": "Any important context or notes for human review"
+        }
+      },
+      "required": ["language", "sentiment", "contains_pii", "extraction_notes"],
+      "additionalProperties": false
+    }
+  },
+  "required": ["contact", "property", "situation", "intent", "metadata"],
+  "additionalProperties": false
+}
