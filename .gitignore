@@ -1,0 +1,88 @@
+#######################################
+# OS / SYSTEM FILES
+#######################################
+# Windows
+desktop.ini
+Thumbs.db
+
+# macOS
+.DS_Store
+
+#######################################
+# PYTHON (BACKEND)
+#######################################
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# Environment variables
+.env
+.env.*
+*.env
+
+# Python tooling
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+#######################################
+# FASTAPI / BACKEND RUNTIME
+#######################################
+# Logs
+*.log
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# Coverage
+.coverage
+htmlcov/
+
+#######################################
+# NODE / REACT (FRONTEND)
+#######################################
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Frontend env
+jumla-frontend/.env
+jumla-frontend/.env.*
+
+#######################################
+# BUILD OUTPUTS
+#######################################
+# Frontend
+dist/
+build/
+
+# Backend
+*.egg-info/
+
+#######################################
+# IDE / EDITORS
+#######################################
+.vscode/
+.idea/
+*.swp
+*.swo
+
+#######################################
+# DOCKER
+#######################################
+docker-data/
+
+#######################################
+# MISC / TEMP
+#######################################
+garage/
