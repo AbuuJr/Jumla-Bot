@@ -46,6 +46,7 @@ from .offer import Offer
 from .lead_score import LeadScore
 from .followup_log import FollowupLog
 from .audit_log import AuditLog
+from .session import Session
 
 __all__ = [
     "Base",
@@ -59,4 +60,5 @@ __all__ = [
     "LeadScore",
     "FollowupLog",
     "AuditLog",
+    "Session"
 ]

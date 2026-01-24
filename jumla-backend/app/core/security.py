@@ -1,7 +1,10 @@
 """
 app/core/security.py
 JWT authentication, password hashing, and RBAC utilities
+ENHANCED: Added refresh token hashing and system owner support
 """
+import hashlib
+import secrets
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 from jose import JWTError, jwt
@@ -38,6 +41,15 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     )
 
 
+# NEW: Hash refresh token for secure storage
+def hash_refresh_token(token: str) -> str:
+    """
+    Hash refresh token for secure storage using SHA-256
+    Uses SHA-256 for fast comparison (not bcrypt which is slow)
+    """
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
 def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
     """Create JWT access token"""
     to_encode = data.copy()
@@ -47,16 +59,25 @@ def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta]
     else:
         expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     
-    to_encode.update({"exp": expire, "type": "access"})
+    to_encode.update({
+        "exp": expire, 
+        "type": "access",
+        "iat": datetime.utcnow()  # NEW: Add issued at time
+    })
     encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
     return encoded_jwt
 
 
 def create_refresh_token(data: Dict[str, Any]) -> str:
-    """Create JWT refresh token"""
+    """Create JWT refresh token with longer expiry and unique ID"""
     to_encode = data.copy()
     expire = datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
-    to_encode.update({"exp": expire, "type": "refresh"})
+    to_encode.update({
+        "exp": expire, 
+        "type": "refresh",
+        "iat": datetime.utcnow(),
+        "jti": secrets.token_urlsafe(32)  # NEW: JWT ID for uniqueness
+    })
     encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
     return encoded_jwt
 
@@ -170,6 +191,7 @@ async def get_current_user_optional(
 def require_role(*allowed_roles: str):
     """
     Dependency factory for role-based access control.
+    ENHANCED: System owner bypasses role checks
     
     Usage:
         @router.post("/admin/users")
@@ -179,6 +201,10 @@ def require_role(*allowed_roles: str):
             ...
     """
     async def role_checker(current_user: User = Depends(get_current_user)) -> User:
+        # NEW: System owner bypasses all role checks
+        if hasattr(current_user, 'is_system_owner') and current_user.is_system_owner:
+            return current_user
+            
         if current_user.role not in allowed_roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -209,3 +235,26 @@ def require_permission(permission: str):
         return current_user
     
     return permission_checker
+
+
+# NEW: System owner dependency
+def require_system_owner():
+    """
+    Dependency to require system owner access.
+    
+    Usage:
+        @router.post("/system/organizations")
+        async def create_org(
+            current_user: User = Depends(require_system_owner())
+        ):
+            ...
+    """
+    async def system_owner_checker(current_user: User = Depends(get_current_user)) -> User:
+        if not hasattr(current_user, 'is_system_owner') or not current_user.is_system_owner:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="System owner access required"
+            )
+        return current_user
+    
+    return system_owner_checker

@@ -62,12 +62,12 @@ def run_migrations_online() -> None:
 
     async def do_run_migrations():
         original_url = settings.DATABASE_URL
-        print("[DEBUG] Original DATABASE_URL:", original_url)
+        #print("[DEBUG] Original DATABASE_URL:", original_url)
 
         # Parse URL and its query
         parsed = urlparse(original_url)
         query = dict(parse_qsl(parsed.query))
-        print("[DEBUG] Parsed query params:", query)
+        #print("[DEBUG] Parsed query params:", query)
 
         # Decide SSL handling based on query params (do NOT mutate settings.DATABASE_URL)
         want_ssl = False
@@ -122,7 +122,7 @@ def run_migrations_online() -> None:
             print("[DEBUG] SSL not requested; connect_args will be empty")
 
         # Debug: show final connection parameters Alembic will use
-        print("[DEBUG] Patched URL for Alembic (ssl/query removed):", patched_url)
+        print(f"[DEBUG] Patched URL for Alembic (ssl/query removed): ***")
         print("[DEBUG] Connect args:", "ssl_context" if "ssl" in connect_args else connect_args)
 
         # Create async engine (pass connect_args only if not empty)
