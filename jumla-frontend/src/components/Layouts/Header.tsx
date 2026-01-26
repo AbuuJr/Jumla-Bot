@@ -22,7 +22,7 @@ export default function Header() {
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         {/* Logo */}
         <Link to="/" className="text-2xl font-bold text-primary-600">
-          Jumla-bot
+          Real estate wholesaler
         </Link>
 
         {/* Navigation */}
