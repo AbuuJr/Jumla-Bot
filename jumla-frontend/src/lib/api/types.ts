@@ -3,26 +3,142 @@
 // Fixed: Changed 'status' to 'stage' to match backend model
 // ============================================================================
 
-// ===== Authentication =====
+// ============================================================================
+// User & Auth Types
+// ============================================================================
+
+export interface User {
+  id: string;
+  email: string;
+  full_name: string | null;
+  role: 'admin' | 'agent' | 'integrator' | 'bot';
+  organization_id: string | null; // null for system owner
+  is_active: boolean;
+  is_system_owner: boolean;
+  last_login_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// ===== Auth Requests =====
+
 export interface LoginRequest {
   email: string;
   password: string;
 }
 
+export interface RefreshTokenRequest {
+  refresh_token: string;
+}
+
+export interface LogoutRequest {
+  refresh_token?: string;
+}
+
+// ===== Auth Responses =====
 export interface LoginResponse {
+  access_token: string;
+  refresh_token: string;
+  token_type: string; // "bearer"
+  expires_in: number; // seconds
+  user?: User; // Optional - some endpoints might not return user
+}
+
+export interface RefreshTokenResponse {
   access_token: string;
   refresh_token: string;
   token_type: string;
   expires_in: number;
-  user: User;
 }
 
-export interface User {
+export interface UserResponse {
   id: string;
   email: string;
-  role: 'admin' | 'agent' | 'viewer';
+  full_name: string | null;
+  role: string;
+  organization_id: string | null;
+  is_active: boolean;
+  is_system_owner: boolean;
+  last_login_at: string | null;
   created_at: string;
+  updated_at: string;
 }
+
+// ============================================================================
+// Session Types (NEW)
+// ============================================================================
+
+export interface Session {
+  id: string;
+  user_id: string;
+  user_agent: string | null;
+  ip_address: string | null;
+  created_at: string;
+  last_used_at: string | null;
+  expires_at: string;
+  is_active: boolean;
+}
+
+export interface SessionsListResponse {
+  items: Session[];
+  total: number;
+  skip: number;
+  limit: number;
+}
+
+// ============================================================================
+// User Management Types (NEW)
+// ============================================================================
+
+export interface CreateUserRequest {
+  email: string;
+  password: string;
+  full_name?: string;
+  role: 'admin' | 'agent' | 'integrator' | 'bot';
+  organization_id: string;
+}
+
+export interface UpdateUserRequest {
+  full_name?: string;
+  role?: 'admin' | 'agent' | 'integrator' | 'bot';
+  is_active?: boolean;
+}
+
+export interface ResetPasswordRequest {
+  email: string;
+  new_password: string;
+}
+
+export interface UsersListResponse {
+  items: User[];
+  total: number;
+  skip: number;
+  limit: number;
+}
+
+// ============================================================================
+// Audit Log Types (NEW)
+// ============================================================================
+
+export interface AuditLog {
+  id: string;
+  performed_by: string;
+  entity_type: string;
+  entity_id: string;
+  action: string;
+  before: any;
+  after: any;
+  created_at: string;
+  ip_address: string | null;
+}
+
+export interface AuditLogsListResponse {
+  items: AuditLog[];
+  total: number;
+  skip: number;
+  limit: number;
+}
+
 
 // ===== Leads =====
 export interface Lead {
@@ -60,13 +176,25 @@ export interface PropertyInfo {
 }
 
 export interface LeadCreateRequest {
-  source: 'chat' | 'form';
-  initial_message?: string;
-  seller_info?: Partial<SellerInfo>;
-  property_info?: Partial<PropertyInfo>;
+  // ... your existing lead types
+  seller_info?: {
+    name?: string;
+    email?: string;
+    phone?: string;
+  };
+  property_info?: {
+    address?: string;
+    city?: string;
+    state?: string;
+    zip?: string;
+  };
+  source?: string;
+  metadata?: Record<string, any>;
 }
 
 export interface LeadCreateResponse {
+  id: string;
+  message: string;
   lead: Lead;
   conversation_id: string;
 }
@@ -79,9 +207,15 @@ export interface LeadsListResponse {
 }
 
 export interface LeadDetailResponse {
-  lead: Lead;
-  conversation?: Conversation;
-  offer?: Offer;
+  id: string;
+  organization_id: string;
+  status: string;
+  seller_info: any;
+  property_info: any;
+  conversations: any[];
+  offers: any[];
+  created_at: string;
+  updated_at: string;
 }
 
 // ===== Conversations =====
@@ -183,4 +317,20 @@ export interface ApiError {
   message: string;
   details?: Record<string, any>;
   status_code: number;
+}
+
+
+// ============================================================================
+// Common Types
+// ============================================================================
+
+export interface PaginationParams {
+  page?: number;
+  page_size?: number;
+}
+
+export interface ApiError {
+  detail: string;
+  status_code: number;
+  error_code?: string;
 }
