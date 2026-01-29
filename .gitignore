@@ -3,6 +3,7 @@
 #######################################
 # Windows
 desktop.ini
+*.ini
 Thumbs.db
 
 # macOS
