@@ -6,6 +6,9 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        backgroundImage: {
+          'app': "linear-gradient(135deg, rgba(15, 23, 42, 0.92) 0%, rgba(30, 41, 59, 0.88) 50%, rgba(51, 65, 85, 0.85) 100%), url('https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=1920&q=80')",
+        },
         primary: {
           50: '#f0f9ff',
           100: '#e0f2fe',
