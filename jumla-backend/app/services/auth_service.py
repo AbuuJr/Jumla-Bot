@@ -1,12 +1,13 @@
 """
 app/services/auth_service.py
-Enhanced authentication service with session management
+Enhanced authentication service with session management and improved error messages
 """
 from typing import Optional, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from datetime import datetime, timedelta
 from fastapi import HTTPException, status
+
 
 from app.models.user import User
 from app.models.session import Session
@@ -22,35 +23,57 @@ from app.core.security import (
 from app.config import settings
 
 
+
+
 class AuthService:
-    """Authentication service with session management and audit logging"""
+    """Authentication service with session management, audit logging, and improved error messages"""
     
     async def authenticate_user(
         self,
         db: AsyncSession,
         email: str,
         password: str
-    ) -> Optional[User]:
+    ) -> User:
         """
-        Authenticate user by email and password
-        Does NOT update last_login - that happens after token creation
+        Authenticate user by email and password with specific error messages
         
         Returns:
-            User if authenticated, None otherwise
+            User if authenticated
+            
+        Raises:
+            HTTPException with specific error messages for different failure cases:
+            - 401: User not found
+            - 401: Wrong password
+            - 403: Account inactive
         """
+        # Check if user exists
         result = await db.execute(
             select(User).where(User.email == email)
         )
         user = result.scalar_one_or_none()
         
         if not user:
-            return None
+            # IMPROVED: Specific error for non-existent users
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="No account found with this email address. Please contact your system administrator to request access."
+            )
         
-        if not verify_password(password, user.password_hash):
-            return None
-        
+        # Check if account is active
         if not user.is_active:
-            return None
+            # IMPROVED: Specific error for inactive accounts
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Your account has been deactivated. Please contact your system administrator for assistance."
+            )
+        
+        # Verify password
+        if not verify_password(password, user.password_hash):
+            # IMPROVED: More helpful error for wrong password
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Incorrect password. Please try again or contact your administrator if you've forgotten your password."
+            )
         
         return user
     
@@ -309,5 +332,10 @@ class AuthService:
         return target_user
 
 
+
+
 # Singleton instance
 auth_service = AuthService()
+
+
+
