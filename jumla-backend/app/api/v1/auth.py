@@ -1,341 +1,198 @@
 """
-app/services/auth_service.py
-Enhanced authentication service with session management and improved error messages
+app/api/v1/auth.py
+Enhanced authentication endpoints with session management and improved error handling
 """
-from typing import Optional, Tuple
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from datetime import datetime, timedelta
-from fastapi import HTTPException, status
 
-
+from app.core.database import get_db
+from app.core.security import get_current_user
 from app.models.user import User
-from app.models.session import Session
-from app.models.audit_log import AuditLog
-from app.core.security import (
-    verify_password, 
-    create_access_token, 
-    create_refresh_token,
-    hash_password,
-    hash_refresh_token,
-    decode_token
+from app.schemas.auth import (
+    LoginRequest,
+    TokenResponse,
+    RefreshTokenRequest,
+    UserResponse,
+    LogoutRequest
 )
-from app.config import settings
+from app.services.auth_service import auth_service
 
 
 
 
-class AuthService:
-    """Authentication service with session management, audit logging, and improved error messages"""
+router = APIRouter()
+
+
+
+
+def get_client_info(request: Request) -> tuple:
+    """Extract client information from request"""
+    user_agent = request.headers.get("user-agent")
+    # Get real IP, considering proxy headers
+    ip_address = (
+        request.headers.get("x-forwarded-for", "").split(",")[0].strip() or
+        request.headers.get("x-real-ip") or
+        request.client.host if request.client else None
+    )
+    return user_agent, ip_address
+
+
+
+
+@router.post("/login", response_model=TokenResponse)
+async def login(
+    credentials: LoginRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Authenticate user and return JWT tokens with improved error messages
     
-    async def authenticate_user(
-        self,
-        db: AsyncSession,
-        email: str,
-        password: str
-    ) -> User:
-        """
-        Authenticate user by email and password with specific error messages
-        
-        Returns:
-            User if authenticated
-            
-        Raises:
-            HTTPException with specific error messages for different failure cases:
-            - 401: User not found
-            - 401: Wrong password
-            - 403: Account inactive
-        """
-        # Check if user exists
-        result = await db.execute(
-            select(User).where(User.email == email)
+    Creates a session for refresh token tracking.
+    
+    Returns:
+        - access_token: Short-lived token for API requests (15 min)
+        - refresh_token: Long-lived token for refreshing access (7 days)
+    
+    Raises:
+        - 401: User not found or incorrect password (with specific message)
+        - 403: Account is inactive/deactivated
+        - 500: Unexpected server error
+    """
+    try:
+        # Authenticate user - now raises HTTPException with specific messages
+        user = await auth_service.authenticate_user(
+            db=db,
+            email=credentials.email,
+            password=credentials.password
         )
-        user = result.scalar_one_or_none()
         
-        if not user:
-            # IMPROVED: Specific error for non-existent users
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="No account found with this email address. Please contact your system administrator to request access."
-            )
+        # Get client info
+        user_agent, ip_address = get_client_info(request)
         
-        # Check if account is active
-        if not user.is_active:
-            # IMPROVED: Specific error for inactive accounts
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Your account has been deactivated. Please contact your system administrator for assistance."
-            )
-        
-        # Verify password
-        if not verify_password(password, user.password_hash):
-            # IMPROVED: More helpful error for wrong password
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Incorrect password. Please try again or contact your administrator if you've forgotten your password."
-            )
-        
-        return user
-    
-    async def create_tokens(
-        self, 
-        db: AsyncSession, 
-        user: User,
-        user_agent: Optional[str] = None,
-        ip_address: Optional[str] = None
-    ) -> Tuple[str, str]:
-        """
-        Create access and refresh tokens with session persistence
-        Updates last_login timestamp
-        
-        Returns:
-            Tuple of (access_token, refresh_token)
-        """
-        token_data = {
-            "sub": str(user.id),
-            "email": user.email,
-            "role": user.role,
-            "org_id": str(user.organization_id) if user.organization_id else None,
-        }
-        
-        access_token = create_access_token(token_data)
-        refresh_token = create_refresh_token(token_data)
-        
-        # Hash and store refresh token
-        refresh_hash = hash_refresh_token(refresh_token)
-        expires_at = datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
-        
-        session = Session(
-            user_id=user.id,
-            refresh_token_hash=refresh_hash,
+        # Create tokens and session
+        access_token, refresh_token = await auth_service.create_tokens(
+            db=db,
+            user=user,
             user_agent=user_agent,
-            ip_address=ip_address,
-            expires_at=expires_at,
-            last_used_at=datetime.utcnow()
-        )
-        
-        db.add(session)
-        
-        # Update last login
-        user.last_login_at = datetime.utcnow()
-        
-        await db.commit()
-        
-        return access_token, refresh_token
-    
-    async def refresh_tokens(
-        self,
-        db: AsyncSession,
-        refresh_token: str,
-        user_agent: Optional[str] = None,
-        ip_address: Optional[str] = None
-    ) -> Tuple[str, str]:
-        """
-        Refresh access token using refresh token
-        Implements token rotation: old refresh token is revoked, new one issued
-        
-        Returns:
-            Tuple of (new_access_token, new_refresh_token)
-        """
-        # Decode refresh token
-        payload = decode_token(refresh_token)
-        
-        if payload.get("type") != "refresh":
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token type"
-            )
-        
-        user_id = payload.get("sub")
-        if not user_id:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token"
-            )
-        
-        # Find and validate session
-        refresh_hash = hash_refresh_token(refresh_token)
-        result = await db.execute(
-            select(Session).where(
-                Session.refresh_token_hash == refresh_hash,
-                Session.user_id == user_id
-            )
-        )
-        session = result.scalar_one_or_none()
-        
-        if not session:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid refresh token"
-            )
-        
-        if not session.is_valid:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Refresh token expired or revoked"
-            )
-        
-        # Get user
-        result = await db.execute(
-            select(User).where(User.id == user_id)
-        )
-        user = result.scalar_one_or_none()
-        
-        if not user or not user.is_active:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="User not found or inactive"
-            )
-        
-        # Revoke old session (token rotation)
-        session.revoke()
-        
-        # Create new tokens and session
-        new_access_token, new_refresh_token = await self.create_tokens(
-            db, user, user_agent, ip_address
-        )
-        
-        return new_access_token, new_refresh_token
-    
-    async def logout(
-        self,
-        db: AsyncSession,
-        refresh_token: str
-    ) -> bool:
-        """
-        Logout user by revoking refresh token session
-        
-        Returns:
-            True if session was revoked, False if not found
-        """
-        refresh_hash = hash_refresh_token(refresh_token)
-        
-        result = await db.execute(
-            select(Session).where(Session.refresh_token_hash == refresh_hash)
-        )
-        session = result.scalar_one_or_none()
-        
-        if session:
-            session.revoke()
-            await db.commit()
-            return True
-        
-        return False
-    
-    async def revoke_all_user_sessions(
-        self,
-        db: AsyncSession,
-        user_id: str
-    ):
-        """Revoke all sessions for a user (e.g., on password change)"""
-        result = await db.execute(
-            select(Session).where(
-                Session.user_id == user_id,
-                Session.revoked_at.is_(None)
-            )
-        )
-        sessions = result.scalars().all()
-        
-        for session in sessions:
-            session.revoke()
-        
-        await db.commit()
-    
-    async def reset_password_for_user(
-        self,
-        db: AsyncSession,
-        requestor: User,
-        target_email: str,
-        new_password: str,
-        ip_address: Optional[str] = None
-    ) -> User:
-        """
-        Reset password for a user with proper authorization checks
-        
-        Rules:
-        - System owner can reset anyone's password
-        - Admin can reset non-admin users in their org
-        - Nobody else can reset passwords
-        
-        Args:
-            requestor: User requesting the password reset
-            target_email: Email of user whose password to reset
-            new_password: New password (plain text, will be hashed)
-            ip_address: IP address of requestor for audit
-        
-        Returns:
-            Updated user
-        
-        Raises:
-            HTTPException if not authorized or user not found
-        """
-        # Find target user
-        result = await db.execute(
-            select(User).where(User.email == target_email)
-        )
-        target_user = result.scalar_one_or_none()
-        
-        if not target_user:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="User not found"
-            )
-        
-        # Check authorization
-        if not requestor.can_reset_password_for(target_user):
-            if target_user.role == "admin":
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Admin passwords can only be reset by System Owner"
-                )
-            else:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Not authorized to reset this user's password"
-                )
-        
-        # Store before state for audit
-        before_state = {
-            "email": target_user.email,
-            "role": target_user.role,
-            "is_active": target_user.is_active
-        }
-        
-        # Update password
-        target_user.password_hash = hash_password(new_password)
-        
-        # Revoke all existing sessions
-        await self.revoke_all_user_sessions(db, str(target_user.id))
-        
-        # Create audit log
-        audit_log = AuditLog(
-            organization_id=target_user.organization_id,
-            user_id=requestor.id if not requestor.is_system_owner else None,
-            performed_by=requestor.email,
-            entity_type="user",
-            entity_id=target_user.id,
-            action="reset_password",
-            before=before_state,
-            after={
-                "email": target_user.email,
-                "role": target_user.role,
-                "is_active": target_user.is_active,
-                "password_changed": True
-            },
             ip_address=ip_address
         )
         
-        db.add(audit_log)
-        await db.commit()
-        await db.refresh(target_user)
+        from app.config import settings
         
-        return target_user
+        return TokenResponse(
+            access_token=access_token,
+            refresh_token=refresh_token,
+            expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        )
+    
+    except HTTPException:
+        # Re-raise HTTPExceptions from auth_service (they have specific error messages)
+        raise
+    
+    except Exception as e:
+        # Catch any unexpected errors
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred during login. Please try again or contact support."
+        )
 
 
 
 
-# Singleton instance
-auth_service = AuthService()
+@router.post("/refresh", response_model=TokenResponse)
+async def refresh_access_token(
+    refresh_request: RefreshTokenRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Refresh access token using refresh token
+    
+    Implements token rotation: old refresh token is revoked,
+    new access and refresh tokens are issued.
+    """
+    user_agent, ip_address = get_client_info(request)
+    
+    try:
+        access_token, refresh_token = await auth_service.refresh_tokens(
+            db=db,
+            refresh_token=refresh_request.refresh_token,
+            user_agent=user_agent,
+            ip_address=ip_address
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token"
+        )
+    
+    from app.config import settings
+    
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+    )
+
+
+
+
+@router.get("/me", response_model=UserResponse)
+async def get_current_user_info(
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get current authenticated user info
+    """
+    return current_user
+
+
+
+
+@router.post("/logout")
+async def logout(
+    logout_request: LogoutRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Logout user by revoking refresh token session
+    
+    Client should also delete tokens from storage.
+    """
+    if logout_request.refresh_token:
+        revoked = await auth_service.logout(
+            db=db,
+            refresh_token=logout_request.refresh_token
+        )
+        
+        if revoked:
+            return {"message": "Logged out successfully", "session_revoked": True}
+        else:
+            return {"message": "Logged out", "session_revoked": False}
+    
+    return {"message": "Logged out successfully"}
+
+
+
+
+@router.post("/logout-all")
+async def logout_all_sessions(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Logout from all devices by revoking all user sessions
+    """
+    await auth_service.revoke_all_user_sessions(
+        db=db,
+        user_id=str(current_user.id)
+    )
+    
+    return {"message": "Logged out from all devices"}
 
 
 
