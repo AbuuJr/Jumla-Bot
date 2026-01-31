@@ -2,10 +2,11 @@
 app/models/lead.py
 Lead SQLAlchemy model with nullable contact fields for chat leads
 """
-from sqlalchemy import String, ForeignKey, JSON, ARRAY, Text
+from sqlalchemy import String, ForeignKey, text, JSON, ARRAY, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from typing import Optional, List, Dict, Any
 from uuid import UUID
+
 from enum import Enum
 
 from . import Base
@@ -59,8 +60,12 @@ class Lead(Base):
     # Data Storage
     raw_data: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
     enriched_data: Mapped[Dict[str, Any]] = mapped_column(JSON, default=dict)
-    tags: Mapped[Optional[List[str]]] = mapped_column(ARRAY(Text))
-    
+    tags: Mapped[List[str]] = mapped_column(
+        ARRAY(Text),
+        nullable=False,
+        default=list,
+        server_default=text("'{}'")
+    )    
     # Assignment
     assigned_to: Mapped[Optional[UUID]] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), 

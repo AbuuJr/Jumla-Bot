@@ -39,6 +39,10 @@ class LeadResponse(BaseModel):
     raw_data: Dict[str, Any] = Field(default_factory=dict)
     enriched_data: Dict[str, Any] = Field(default_factory=dict)
     tags: List[str] = Field(default_factory=list)
+    @field_validator("tags", mode="before")
+    @classmethod
+    def normalize_tags(cls, v):
+        return v or []
     assigned_to: Optional[UUID4] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
@@ -119,7 +123,7 @@ class LeadUpdate(BaseModel):
     phone: Optional[str] = None
     stage: Optional[LeadStage] = None
     temperature: Optional[Temperature] = None
-    tags: Optional[List[str]] = None
+    tags: Optional[List[str]] = Field(default=None)
     assigned_to: Optional[UUID4] = None
     enriched_data: Optional[Dict[str, Any]] = None
 
