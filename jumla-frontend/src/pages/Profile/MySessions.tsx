@@ -166,7 +166,7 @@ export default function MySessions() {
 
 function StatCard({
   label,
-  value,s
+  value,
   variant,
 }: {
   label: string;

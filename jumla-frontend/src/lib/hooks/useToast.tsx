@@ -1,13 +1,8 @@
-// src/lib/hooks/useToast.ts
-// Simple toast notification hook (you can replace with react-hot-toast or similar)
-
 import { create } from 'zustand';
 
-// ============================================================================
-// Toast Store - Simple notification system
-// ============================================================================
 
 export type ToastType = 'success' | 'error' | 'warning' | 'info';
+
 
 export interface Toast {
   id: string;
@@ -16,25 +11,33 @@ export interface Toast {
   duration?: number;
 }
 
-interface ToastState {
+
+interface ToastStore {
   toasts: Toast[];
   addToast: (toast: Omit<Toast, 'id'>) => void;
   removeToast: (id: string) => void;
-  clearAll: () => void;
+  success: (message: string) => void;
+  error: (message: string) => void;
+  warning: (message: string) => void;
+  info: (message: string) => void;
 }
 
-export const useToastStore = create<ToastState>((set) => ({
+
+export const useToast = create<ToastStore>((set) => ({
   toasts: [],
+
 
   addToast: (toast) => {
     const id = Math.random().toString(36).substring(7);
     const newToast = { ...toast, id };
 
+
     set((state) => ({
       toasts: [...state.toasts, newToast],
     }));
 
-    // Auto-remove after duration (default 5s)
+
+    // Auto-remove after duration
     const duration = toast.duration || 5000;
     setTimeout(() => {
       set((state) => ({
@@ -43,37 +46,61 @@ export const useToastStore = create<ToastState>((set) => ({
     }, duration);
   },
 
+
   removeToast: (id) => {
     set((state) => ({
       toasts: state.toasts.filter((t) => t.id !== id),
     }));
   },
 
-  clearAll: () => {
-    set({ toasts: [] });
+
+  success: (message) => {
+    set((state) => {
+      const id = Math.random().toString(36).substring(7);
+      const toast = { id, type: 'success' as ToastType, message };
+      setTimeout(() => {
+        set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) }));
+      }, 5000);
+      return { toasts: [...state.toasts, toast] };
+    });
+  },
+
+
+  error: (message) => {
+    set((state) => {
+      const id = Math.random().toString(36).substring(7);
+      const toast = { id, type: 'error' as ToastType, message };
+      setTimeout(() => {
+        set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) }));
+      }, 5000);
+      return { toasts: [...state.toasts, toast] };
+    });
+  },
+
+
+  warning: (message) => {
+    set((state) => {
+      const id = Math.random().toString(36).substring(7);
+      const toast = { id, type: 'warning' as ToastType, message };
+      setTimeout(() => {
+        set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) }));
+      }, 5000);
+      return { toasts: [...state.toasts, toast] };
+    });
+  },
+
+
+  info: (message) => {
+    set((state) => {
+      const id = Math.random().toString(36).substring(7);
+      const toast = { id, type: 'info' as ToastType, message };
+      setTimeout(() => {
+        set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) }));
+      }, 5000);
+      return { toasts: [...state.toasts, toast] };
+    });
   },
 }));
 
-// ============================================================================
-// Convenience Hook
-// ============================================================================
 
-export const useToast = () => {
-  const addToast = useToastStore((state) => state.addToast);
-
-  return {
-    success: (message: string, duration?: number) => {
-      addToast({ type: 'success', message, duration });
-    },
-    error: (message: string, duration?: number) => {
-      addToast({ type: 'error', message, duration });
-    },
-    warning: (message: string, duration?: number) => {
-      addToast({ type: 'warning', message, duration });
-    },
-    info: (message: string, duration?: number) => {
-      addToast({ type: 'info', message, duration });
-    },
-  };
-};
 
