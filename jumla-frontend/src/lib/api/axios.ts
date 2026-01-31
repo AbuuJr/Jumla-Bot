@@ -66,10 +66,9 @@ apiClient.interceptors.response.use(
 
     // Handle 401 errors (unauthorized)
     if (error.response?.status === 401 && !originalRequest._retry) {
-      // Don't retry login or refresh endpoints
-      if (originalRequest.url?.includes('/auth/login') || 
-          originalRequest.url?.includes('/auth/refresh')) {
-        return Promise.reject(error);
+      // Don't attempt token refresh for login or refresh endpoints, but return the enhanced error
+      if (originalRequest.url?.includes('/auth/login') || originalRequest.url?.includes('/auth/refresh')) {
+        return Promise.reject(enhanceError(error));
       }
 
       if (isRefreshing) {
@@ -98,7 +97,7 @@ apiClient.interceptors.response.use(
         isRefreshing = false;
         processQueue(error, null);
         clearAuthAndRedirect();
-        return Promise.reject(error);
+        return Promise.reject(enhanceError(error));
       }
 
       try {
@@ -123,11 +122,11 @@ apiClient.interceptors.response.use(
 
         // Retry original request
         return apiClient(originalRequest);
-      } catch (refreshError) {
+      } catch (refreshError: any) {
         // Refresh failed, clear everything and redirect to login
         processQueue(refreshError, null);
         clearAuthAndRedirect();
-        return Promise.reject(refreshError);
+        return Promise.reject(enhanceError(refreshError));
       } finally {
         isRefreshing = false;
       }
@@ -185,10 +184,10 @@ function clearAuthAndRedirect() {
 
 function enhanceError(error: AxiosError): Error {
   const status = error.response?.status;
-  const data = error.response?.data as any;
+  const data = (error.response?.data ?? {}) as any;
 
-  // Use backend error message if available
-  const backendMessage = data?.detail || data?.message;
+  // Use backend error message if available (FastAPI uses `detail`)
+  const backendMessage = data?.detail || data?.message || data?.error || null;
 
   let userMessage: string;
 
@@ -197,7 +196,8 @@ function enhanceError(error: AxiosError): Error {
       userMessage = backendMessage || 'Invalid request. Please check your input.';
       break;
     case 401:
-      userMessage = 'Your session has expired. Please login again.';
+      // Prefer backend-provided message for 401 (useful for incorrect credentials)
+      userMessage = backendMessage || 'Your session has expired. Please login again.';
       break;
     case 403:
       userMessage = backendMessage || 'You do not have permission to perform this action.';
@@ -259,8 +259,3 @@ export const clearTokens = (): void => {
 // ============================================================================
 
 export default apiClient;
-
-
-
-
-

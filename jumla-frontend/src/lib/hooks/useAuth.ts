@@ -64,11 +64,14 @@ export const useAuth = create<AuthState>()(
             error: null,
           });
         } catch (error: any) {
+          // Save the enhanced error message (axios enhanceError returns user-friendly message)
+          const msg = error?.message || (error?.response?.data?.detail ?? 'Login failed');
           set({
-            error: error.message || 'Login failed',
+            error: msg,
             isLoading: false,
             isAuthenticated: false,
           });
+          // rethrow the original enhanced error so callers can inspect response if needed
           throw error;
         }
       },
@@ -255,4 +258,3 @@ export const useOrganizationId = (): string | null => {
   const user = useAuth((state) => state.user);
   return user?.organization_id || null;
 };
-
